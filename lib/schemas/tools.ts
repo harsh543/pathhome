@@ -48,7 +48,7 @@ export const CreateFollowUpInputSchema = z.object({
   actor: ActorSchema,
   caseId: UuidSchema,
   description: z.string().min(1),
-  dueAt: z.date().nullable().optional(),
+  dueAt: z.coerce.date().nullable().optional(),
   assignedTo: z.string().nullable().optional(),
   status: z.string().min(1).optional(),
   auditMeta: AuditMetaSchema,
@@ -59,7 +59,7 @@ export const SaveTranscriptInputSchema = z.object({
   callSessionId: UuidSchema,
   turns: z.array(TranscriptTurnSchema),
   redacted: z.boolean().default(true),
-  ttlExpiresAt: z.date().nullable().optional(),
+  ttlExpiresAt: z.coerce.date().nullable().optional(),
   auditMeta: AuditMetaSchema,
 });
 
@@ -89,6 +89,25 @@ export const SaveMetricsInputSchema = z.object({
   auditMeta: AuditMetaSchema,
 });
 
+export const CreatePersonInputSchema = z.object({
+  actor: ActorSchema,
+  firstName: z.string().nullable().optional(),
+  lastName: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  preferredContact: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  auditMeta: AuditMetaSchema,
+});
+
+export const RecordConsentInputSchema = z.object({
+  actor: ActorSchema,
+  personId: UuidSchema,
+  scope: z.string().min(1),
+  granted: z.boolean(),
+  method: z.enum(["verbal", "written"]),
+  auditMeta: AuditMetaSchema,
+});
+
 export const GetCaseDetailInputSchema = z.object({
   caseId: UuidSchema,
 });
@@ -107,5 +126,7 @@ export type CreateFollowUpInput = z.infer<typeof CreateFollowUpInputSchema>;
 export type SaveTranscriptInput = z.infer<typeof SaveTranscriptInputSchema>;
 export type SaveEnrichmentInput = z.infer<typeof SaveEnrichmentInputSchema>;
 export type SaveMetricsInput = z.infer<typeof SaveMetricsInputSchema>;
+export type CreatePersonInput = z.infer<typeof CreatePersonInputSchema>;
+export type RecordConsentInput = z.infer<typeof RecordConsentInputSchema>;
 export type GetCaseDetailInput = z.infer<typeof GetCaseDetailInputSchema>;
 export type BrowserCallSessionInput = z.infer<typeof BrowserCallSessionInputSchema>;

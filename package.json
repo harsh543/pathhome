@@ -11,7 +11,8 @@
     "db:down": "docker compose down",
     "db:reset": "docker compose down -v && docker compose up -d --wait",
     "migrate": "tsx lib/db/migrate.ts",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "test": "tsx --test lib/db/queries.test.ts"
   },
   "dependencies": {
     "@types/pg": "^8.11.10",
