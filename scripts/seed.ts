@@ -189,15 +189,161 @@ async function seed(): Promise<void> {
       ],
     );
 
+    // call_metrics for v1 — fleet analysis page needs data to render
+    await client.query(
+      `insert into call_metrics
+         (call_session_id, prompt_version_id, interruption_count, mean_turn_latency_ms,
+          entity_capture_rate, completion, failure_mode)
+       values ($1, $2, 1, 420, 0.85, true, 'none')`,
+      [session.id, prompt.id],
+    );
+
+    // ── Second prompt version (v2) + second case for cinematic Fleet Analysis ──
+
+    const prompt2Result = await client.query<IdRow>(
+      `insert into prompt_versions (name, version, system_prompt, params)
+       values ($1, $2, $3, $4::jsonb)
+       returning id`,
+      [
+        "pathhome-intake",
+        "v2",
+        "You are a reentry and housing intake assistant. Ask only one question at a time. Collect facts for human case managers and do not make final decisions.",
+        JSON.stringify({ temperature: 0, optOutModelTraining: true, maxTurns: 12 }),
+      ],
+    );
+    const prompt2 = prompt2Result.rows[0];
+    if (!prompt2) throw new Error("Failed to insert prompt v2");
+
+    const person2Result = await client.query<IdRow>(
+      `insert into people (first_name, last_name, phone, preferred_contact, notes)
+       values ($1, $2, $3, $4, $5)
+       returning id`,
+      ["Alex", "Morgan", "555-0199", "phone", "Demo case v2 — cinematic seed"],
+    );
+    const person2 = person2Result.rows[0];
+    if (!person2) throw new Error("Failed to insert demo person 2");
+
+    await client.query(
+      `insert into consent_records (person_id, scope, granted, method) values ($1, $2, $3, $4)`,
+      [person2.id, "referral", true, "verbal"],
+    );
+
+    const case2Result = await client.query<IdRow>(
+      `insert into cases (person_id, status, priority) values ($1, $2, $3) returning id`,
+      [person2.id, "in_progress", "critical"],
+    );
+    const case2 = case2Result.rows[0];
+    if (!case2) throw new Error("Failed to insert demo case 2");
+
+    await client.query(
+      `insert into needs (case_id, category, description, urgency) values ($1,$2,$3,$4)`,
+      [case2.id, "medication", "Needs prescription refilled before parole meeting.", "critical"],
+    );
+    await client.query(
+      `insert into needs (case_id, category, description, urgency) values ($1,$2,$3,$4)`,
+      [case2.id, "id_docs", "Lost ID during incarceration — needs replacement.", "high"],
+    );
+    await client.query(
+      `insert into follow_ups (case_id, description, due_at, assigned_to) values ($1,$2,now() + interval '6 hours',$3)`,
+      [case2.id, "Contact pharmacy re: emergency prescription transfer.", "demo-operator"],
+    );
+
+    const session2Result = await client.query<IdRow>(
+      `insert into call_sessions (case_id, person_id, channel, prompt_version_id, disposition, ended_at)
+       values ($1,$2,'browser',$3,'completed',now()) returning id`,
+      [case2.id, person2.id, prompt2.id],
+    );
+    const session2 = session2Result.rows[0];
+    if (!session2) throw new Error("Failed to insert demo session 2");
+
+    const turns2 = [
+      { index: 0, speaker: "agent", text: "PathHome intake. What's your first name?" },
+      { index: 1, speaker: "caller", text: "[NAME]. I'm on parole and I need help fast." },
+      { index: 2, speaker: "agent", text: "What's the most urgent thing you need right now?" },
+      { index: 3, speaker: "caller", text: "I ran out of my medication and my parole officer meets me in 8 hours." },
+      { index: 4, speaker: "agent", text: "Got it. Do you have a prescription number or pharmacy?" },
+      { index: 5, speaker: "caller", text: "It was at [PHARMACY] but they said they need authorization. I also have no ID." },
+      { index: 6, speaker: "agent", text: "I'm flagging medication and ID replacement as critical needs for immediate caseworker follow-up." },
+    ];
+    await client.query(
+      `insert into transcripts (call_session_id, turns, redacted, ttl_expires_at)
+       values ($1,$2::jsonb,true,now() + make_interval(hours => $3))`,
+      [session2.id, JSON.stringify(turns2), Number(process.env.TRANSCRIPT_TTL_HOURS ?? 72)],
+    );
+
+    await client.query(
+      `insert into enrichment_results
+         (call_session_id, summary, urgency_overall, completion_status,
+          entities, topics, blockers, requires_human_followup, model)
+       values ($1,$2,'critical','complete',$3::jsonb,$4::jsonb,$5::jsonb,true,'seed-demo')`,
+      [
+        session2.id,
+        "Parolee needs emergency medication refill and ID replacement before parole meeting in ~8 hours.",
+        JSON.stringify({ neighborhoods: [], appointment_dates: ["today in 8 hours"], provider_mentions: [], caseworker: null }),
+        JSON.stringify(["medication", "id_docs", "probation"]),
+        JSON.stringify([
+          "Medication authorization not yet confirmed",
+          "No ID — pharmacy cannot dispense without caseworker authorization",
+          "Parole meeting is time-critical — 8-hour window",
+        ]),
+      ],
+    );
+
+    // v2 call_metrics — slightly worse completion + higher latency for contrast
+    await client.query(
+      `insert into call_metrics
+         (call_session_id, prompt_version_id, interruption_count, mean_turn_latency_ms,
+          entity_capture_rate, completion, failure_mode)
+       values ($1,$2,3,680,0.70,true,'none')`,
+      [session2.id, prompt2.id],
+    );
+
+    // A dropped call on v2 — populates interruption_loop failure mode
+    const person3Result = await client.query<IdRow>(
+      `insert into people (first_name, last_name, notes)
+       values ($1,$2,$3) returning id`,
+      ["Casey", "Rivera", "Dropped-call demo — cinematic seed"],
+    );
+    const person3 = person3Result.rows[0];
+    if (!person3) throw new Error("Failed to insert person 3");
+
+    const case3Result = await client.query<IdRow>(
+      `insert into cases (person_id, status, priority) values ($1,'open','medium') returning id`,
+      [person3.id],
+    );
+    const case3 = case3Result.rows[0];
+    if (!case3) throw new Error("Failed to insert case 3");
+
+    const session3Result = await client.query<IdRow>(
+      `insert into call_sessions (case_id, person_id, channel, prompt_version_id, disposition, ended_at)
+       values ($1,$2,'browser',$3,'dropped',now() - interval '2 hours') returning id`,
+      [case3.id, person3.id, prompt2.id],
+    );
+    const session3 = session3Result.rows[0];
+    if (!session3) throw new Error("Failed to insert demo session 3");
+
+    await client.query(
+      `insert into call_metrics
+         (call_session_id, prompt_version_id, interruption_count, mean_turn_latency_ms,
+          entity_capture_rate, completion, failure_mode)
+       values ($1,$2,8,910,0.20,false,'interruption_loop')`,
+      [session3.id, prompt2.id],
+    );
+
     await client.query(
       `insert into audit_log (actor, action, entity, entity_id, meta)
-       values ($1, $2, $3, $4, $5::jsonb)`,
+       values ($1,$2,$3,$4,$5::jsonb)`,
       [
         "seed-script",
-        "seed_phase_1",
+        "seed_cinematic",
         "cases",
         demoCase.id,
-        JSON.stringify({ providerCount: providerIds.length, promptVersionId: prompt.id }),
+        JSON.stringify({
+          providerCount: providerIds.length,
+          promptV1: prompt.id,
+          promptV2: prompt2.id,
+          cases: [demoCase.id, case2.id, case3.id],
+        }),
       ],
     );
 
@@ -206,8 +352,8 @@ async function seed(): Promise<void> {
         level: "info",
         event: "seed_complete",
         providers: providerIds.length,
-        promptVersionId: prompt.id,
-        caseId: demoCase.id,
+        promptVersions: [prompt.id, prompt2.id],
+        cases: [demoCase.id, case2.id, case3.id],
       }),
     );
   });
