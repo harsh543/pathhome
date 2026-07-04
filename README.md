@@ -4,6 +4,9 @@ PathHome is a voice-first reentry and housing coordination platform for nonprofi
 
 Currently implemented through **Phase 2**: Next.js App Router scaffold (strict TypeScript), a `pg` client with env-driven TLS, an idempotent PostgreSQL migration runner, the full data model, repeatable demo seed data, Zod schemas, typed query functions, audit-backed writes, and consent-gated referral creation.
 
+For cloud deployment, infrastructure notes, and a demo talk track, see
+[DEPLOYMENT_DEMO_GUIDE.md](./DEPLOYMENT_DEMO_GUIDE.md).
+
 ## Prerequisites
 
 - Node.js 20+
