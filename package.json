@@ -1,0 +1,32 @@
+{
+  "name": "pathhome",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "typecheck": "tsc --noEmit",
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down",
+    "db:reset": "docker compose down -v && docker compose up -d --wait",
+    "migrate": "tsx lib/db/migrate.ts",
+    "seed": "tsx scripts/seed.ts"
+  },
+  "dependencies": {
+    "@types/pg": "^8.11.10",
+    "dotenv": "^16.4.7",
+    "next": "^15.1.0",
+    "pg": "^8.13.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.1",
+    "@types/react-dom": "^19.0.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

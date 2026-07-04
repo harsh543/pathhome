@@ -1,0 +1,5 @@
+# pnpm reads build-script approvals here (not from package.json).
+# esbuild backs tsx (migrate/seed scripts); sharp backs next/image.
+allowBuilds:
+  esbuild: true
+  sharp: true

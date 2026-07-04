@@ -1,0 +1,23 @@
+# Local Aurora PostgreSQL stand-in for development.
+# The only difference from Aurora is the connection string + SSL flag, both env-driven.
+# Bring up:  docker compose up -d   |   Tear down (wipe):  docker compose down -v
+services:
+  postgres:
+    image: postgres:16
+    container_name: pathhome-postgres
+    environment:
+      POSTGRES_USER: pathhome
+      POSTGRES_PASSWORD: pathhome
+      POSTGRES_DB: pathhome
+    ports:
+      - "5432:5432"
+    volumes:
+      - pathhome_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pathhome -d pathhome"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pathhome_pgdata:
