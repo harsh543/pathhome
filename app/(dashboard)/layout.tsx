@@ -13,6 +13,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <Link href="/">Cases</Link>
           <Link href="/analytics">Analytics</Link>
           <Link href="/fleet-analysis">Fleet Analysis</Link>
+          <Link href="/voice">Browser Intake</Link>
         </nav>
         <div className="trust">
           Assistive, not autonomous. A human owns every housing, legal, and benefits decision.
