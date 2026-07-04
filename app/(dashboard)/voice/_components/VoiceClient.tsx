@@ -23,7 +23,7 @@ interface Turn {
   partial?: boolean;
 }
 
-type CallState = "idle" | "connecting" | "active" | "ended" | "error";
+type CallState = "idle" | "connecting" | "active" | "ended" | "enriching" | "enriched" | "error";
 
 // Scripted demo transcript replayed when ASSEMBLYAI_API_KEY is absent.
 const MOCK_SCRIPT: Turn[] = [
@@ -150,15 +150,17 @@ export default function VoiceClient() {
     if (session.mode === "mock") {
       setCallState("active");
       let idx = 0;
+      const accum: Turn[] = [];
       mockTimerRef.current = setInterval(() => {
         const turn = MOCK_SCRIPT[idx];
         if (!turn) {
           clearInterval(mockTimerRef.current!);
           mockTimerRef.current = null;
-          setCallState("ended");
+          void triggerEnrich(session.sessionId, accum);
           return;
         }
         upsertTurn(turn);
+        accum.push(turn);
         idx++;
       }, 1800);
       return;
@@ -224,6 +226,31 @@ export default function VoiceClient() {
     });
   }, [upsertTurn, cleanup, startMic]);
 
+  const triggerEnrich = useCallback(
+    async (sid: string, completedTurns: Turn[]) => {
+      setCallState("enriching");
+      try {
+        const res = await fetch(`/api/enrich/${sid}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            turns: completedTurns
+              .filter((t) => !t.partial)
+              .map(({ index, speaker, text }) => ({ index, speaker, text })),
+          }),
+        });
+        if (res.ok) {
+          setCallState("enriched");
+        } else {
+          setCallState("ended");
+        }
+      } catch {
+        setCallState("ended");
+      }
+    },
+    [],
+  );
+
   const endCall = useCallback(() => {
     cleanup();
     setCallState("ended");
@@ -234,6 +261,7 @@ export default function VoiceClient() {
     setTurns([]);
     setSessionId(null);
     setErrorMsg(null);
+    turnIndexRef.current = 0;
   }, []);
 
   return (
@@ -252,6 +280,17 @@ export default function VoiceClient() {
             <button className="btn-danger" onClick={endCall}>
               End Call
             </button>
+          </>
+        )}
+        {callState === "enriching" && (
+          <span className="call-status-connecting">Enriching transcript…</span>
+        )}
+        {callState === "enriched" && (
+          <>
+            <span style={{ color: "var(--resolved)", fontWeight: 600, fontSize: 13 }}>
+              ✓ Enrichment queued
+            </span>
+            <button className="btn-secondary" onClick={reset}>New Call</button>
           </>
         )}
         {(callState === "ended" || callState === "error") && (
