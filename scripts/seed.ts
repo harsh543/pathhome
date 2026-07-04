@@ -122,10 +122,71 @@ async function seed(): Promise<void> {
       [demoCase.id, need.id, providerIds[0], "proposed", "Seeded referral for operator review"],
     );
 
+    // second need so the case detail shows a multi-need caseload
+    await client.query(
+      `insert into needs (case_id, category, description, urgency)
+       values ($1, $2, $3, $4)`,
+      [demoCase.id, "transport", "Needs a ride to court tomorrow morning.", "high"],
+    );
+
     await client.query(
       `insert into follow_ups (case_id, description, due_at, assigned_to)
        values ($1, $2, now() + interval '1 day', $3)`,
       [demoCase.id, "Confirm shelter availability and transportation plan.", "demo-operator"],
+    );
+    await client.query(
+      `insert into follow_ups (case_id, description, due_at, assigned_to)
+       values ($1, $2, now() + interval '18 hours', $3)`,
+      [demoCase.id, "Verify probation check-in / court logistics for tomorrow.", "demo-operator"],
+    );
+
+    // A completed call session with a redacted transcript + enrichment, so the case
+    // detail renders transcript, summary, and the unresolved-blockers card end-to-end.
+    const ttlHours = Number(process.env.TRANSCRIPT_TTL_HOURS ?? 72);
+    const sessionResult = await client.query<IdRow>(
+      `insert into call_sessions (case_id, person_id, channel, prompt_version_id, disposition, ended_at)
+       values ($1, $2, 'browser', $3, 'completed', now())
+       returning id`,
+      [demoCase.id, person.id, prompt.id],
+    );
+    const session = sessionResult.rows[0];
+    if (!session) throw new Error("Failed to insert demo call session");
+
+    const turns = [
+      { index: 0, speaker: "agent", text: "You've reached PathHome intake. Can I get your first name?" },
+      { index: 1, speaker: "caller", text: "It's [NAME]. I was released today." },
+      { index: 2, speaker: "agent", text: "Thanks [NAME]. Do you have somewhere to stay tonight?" },
+      { index: 3, speaker: "caller", text: "No, I need a bed tonight. And I have court tomorrow morning." },
+      { index: 4, speaker: "agent", text: "Understood. Do you need a ride to court?" },
+      { index: 5, speaker: "caller", text: "Yes, I don't have transportation. I'm also looking for work." },
+      { index: 6, speaker: "agent", text: "Got it. I'm noting shelter, transport, and job support for a caseworker to follow up." },
+    ];
+    await client.query(
+      `insert into transcripts (call_session_id, turns, redacted, ttl_expires_at)
+       values ($1, $2::jsonb, true, now() + make_interval(hours => $3))`,
+      [session.id, JSON.stringify(turns), ttlHours],
+    );
+
+    await client.query(
+      `insert into enrichment_results
+         (call_session_id, summary, urgency_overall, completion_status,
+          entities, topics, blockers, requires_human_followup, model)
+       values ($1, $2, 'high', 'complete', $3::jsonb, $4::jsonb, $5::jsonb, true, 'seed-demo')`,
+      [
+        session.id,
+        "Recently released caller needs a shelter bed tonight, has court tomorrow morning, needs transportation, and is seeking work.",
+        JSON.stringify({
+          neighborhoods: ["Downtown"],
+          appointment_dates: ["tomorrow 9:00am"],
+          provider_mentions: [],
+          caseworker: null,
+        }),
+        JSON.stringify(["shelter", "probation", "transport", "employment"]),
+        JSON.stringify([
+          "No shelter bed confirmed for tonight",
+          "Court appointment conflicts with shelter intake window",
+        ]),
+      ],
     );
 
     await client.query(

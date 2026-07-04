@@ -218,6 +218,12 @@ export const FleetMetricsRowSchema = z.object({
   failure_modes: z.record(z.coerce.number().int().nonnegative()),
 });
 
+export type CaseStatus = z.infer<typeof CaseStatusSchema>;
+export type NeedCategory = z.infer<typeof NeedCategorySchema>;
+export type UrgencyLevel = z.infer<typeof UrgencyLevelSchema>;
+export type ReferralStatus = z.infer<typeof ReferralStatusSchema>;
+export type ChannelType = z.infer<typeof ChannelTypeSchema>;
+
 export type ProviderRow = z.infer<typeof ProviderRowSchema>;
 export type PersonRow = z.infer<typeof PersonRowSchema>;
 export type ConsentRecordRow = z.infer<typeof ConsentRecordRowSchema>;
